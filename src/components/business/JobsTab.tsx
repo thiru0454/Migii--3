@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { supabase } from "@/utils/supabaseClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Badge } from "@/components/ui/badge";
 
 interface JobFormData {
   title: string;
@@ -19,10 +20,38 @@ interface JobFormData {
   description: string;
   requirements: string;
   contact_email: string;
+  workers_needed: number;
 }
+
+interface WorkerSkill {
+  skill: string;
+  count: number;
+  workers: Array<{
+    id: string;
+    name: string;
+    experience: number;
+    rating: number;
+  }>;
+}
+
+// Default skills that should always be available
+const DEFAULT_SKILLS = [
+  "Carpenter",
+  "Plumber",
+  "Cook",
+  "Electrician",
+  "Cleaner",
+  "Mason",
+  "Painter",
+  "Welder",
+  "Driver",
+  "Security Guard"
+];
 
 export function JobsTab() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [workerSkills, setWorkerSkills] = useState<WorkerSkill[]>([]);
+  const [selectedSkillDetails, setSelectedSkillDetails] = useState<WorkerSkill | null>(null);
   const [jobFormData, setJobFormData] = useState<JobFormData>({
     title: "",
     company: "",
@@ -33,7 +62,71 @@ export function JobsTab() {
     description: "",
     requirements: "",
     contact_email: "",
+    workers_needed: 1,
   });
+
+  useEffect(() => {
+    fetchWorkerSkills();
+  }, []);
+
+  const fetchWorkerSkills = async () => {
+    try {
+      // Get available workers grouped by skill
+      const { data: workers, error } = await supabase
+        .from("workers")
+        .select("id, name, skill, experience, rating")
+        .eq("status", "Available");
+
+      // Initialize with default skills regardless of error
+      const skillMap = new Map<string, WorkerSkill>();
+      DEFAULT_SKILLS.forEach(skill => {
+        skillMap.set(skill, {
+          skill,
+          count: 0,
+          workers: []
+        });
+      });
+
+      if (error) {
+        console.error("Error fetching workers:", error);
+        // Continue with default skills even if there's an error
+        setWorkerSkills(Array.from(skillMap.values()));
+        return;
+      }
+
+      // Add workers to their respective skills
+      workers?.forEach(worker => {
+        if (skillMap.has(worker.skill)) {
+          const skillData = skillMap.get(worker.skill)!;
+          skillData.count++;
+          skillData.workers.push({
+            id: worker.id,
+            name: worker.name,
+            experience: worker.experience || 0,
+            rating: worker.rating || 0
+          });
+        }
+      });
+
+      setWorkerSkills(Array.from(skillMap.values()));
+    } catch (error) {
+      console.error("Error in fetchWorkerSkills:", error);
+      // Provide fallback with default skills
+      const defaultSkills = DEFAULT_SKILLS.map(skill => ({
+        skill,
+        count: 0,
+        workers: []
+      }));
+      setWorkerSkills(defaultSkills);
+      toast.error("Failed to load available skills. Using default skills list.");
+    }
+  };
+
+  const handleSkillChange = (skill: string) => {
+    setJobFormData(prev => ({ ...prev, title: skill }));
+    const skillDetails = workerSkills.find(s => s.skill === skill);
+    setSelectedSkillDetails(skillDetails || null);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -48,38 +141,112 @@ export function JobsTab() {
     setIsSubmitting(true);
 
     try {
-      // Validate form data
-      if (!jobFormData.title || !jobFormData.description || !jobFormData.company) {
+      // Step 1: Validate form data
+      if (!jobFormData.title || !jobFormData.description) {
         toast.error("Please fill in all required fields");
         return;
       }
 
-      // Add job to Supabase
-      const { data, error } = await supabase
+      // Step 2: Get current user and business information
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+      const { data: businessData, error: businessError } = await supabase
+        .from("businesses")
+        .select("id, name")
+        .eq("email", currentUser.email)
+        .single();
+
+      if (businessError) {
+        console.error("Error fetching business data:", businessError);
+        throw new Error("Failed to fetch business information");
+      }
+
+      // Step 3: Create job posting in database
+      const { data: jobData, error: jobError } = await supabase
         .from("jobs")
         .insert([
           {
             title: jobFormData.title,
-            company: jobFormData.company,
+            company: businessData.name,
             location: jobFormData.location,
             job_type: jobFormData.type,
             category: jobFormData.category,
             salary: jobFormData.salary,
             description: jobFormData.description,
             requirements: jobFormData.requirements,
-            contact_email: jobFormData.contact_email,
+            contact_email: jobFormData.contact_email || currentUser.email,
+            workers_needed: jobFormData.workers_needed,
             posted_at: new Date().toISOString(),
-            status: "active"
+            status: "active", // Set status as active immediately
+            business_id: businessData.id
           }
         ])
-        .select();
+        .select()
+        .single();
 
-      if (error) {
-        console.error("Error adding job:", error);
-        throw error;
+      if (jobError) {
+        console.error("Error creating job:", jobError);
+        throw new Error("Failed to create job posting");
       }
 
-      toast.success("Job posted successfully!");
+      // Step 4: Create admin notification (for information only)
+      const { error: adminNotificationError } = await supabase
+        .from("admin_notifications")
+        .insert([
+          {
+            type: "new_job",
+            job_id: jobData.id,
+            business_id: businessData.id,
+            business_name: businessData.name,
+            skill: jobFormData.title,
+            workers_needed: jobFormData.workers_needed,
+            created_at: new Date().toISOString(),
+            status: "info", // Changed to info status since no approval needed
+            title: `New Job Posted: ${jobFormData.title}`,
+            message: `${businessData.name} has posted a job for ${jobFormData.workers_needed} ${jobFormData.title}(s)`
+          }
+        ]);
+
+      if (adminNotificationError) {
+        console.error("Error creating admin notification:", adminNotificationError);
+        // Continue execution even if admin notification fails
+      }
+
+      // Step 5: Find all workers with matching skill
+      const { data: workers, error: workersError } = await supabase
+        .from("workers")
+        .select("id, name, email")
+        .eq("skill", jobFormData.title);
+
+      if (workersError) {
+        console.error("Error fetching workers:", workersError);
+        // Continue execution even if worker fetch fails
+      }
+
+      // Step 6: Create notifications for all workers with matching skill
+      if (workers && workers.length > 0) {
+        const workerNotifications = workers.map(worker => ({
+          worker_id: worker.id,
+          job_id: jobData.id,
+          type: "job_available",
+          created_at: new Date().toISOString(),
+          status: "unread",
+          title: `New ${jobFormData.title} job available`,
+          message: `${businessData.name} is looking for ${jobFormData.workers_needed} ${jobFormData.title}(s)`,
+          action_required: true, // Indicates worker needs to take action
+          action_type: "accept_decline" // Specifies the type of action needed
+        }));
+
+        const { error: workerNotificationError } = await supabase
+          .from("worker_notifications")
+          .insert(workerNotifications);
+
+        if (workerNotificationError) {
+          console.error("Error creating worker notifications:", workerNotificationError);
+          // Continue execution even if worker notifications fail
+        }
+      }
+
+      toast.success("Job posted successfully! Workers will be notified.");
       
       // Reset form
       setJobFormData({
@@ -92,7 +259,9 @@ export function JobsTab() {
         description: "",
         requirements: "",
         contact_email: "",
+        workers_needed: 1,
       });
+      setSelectedSkillDetails(null);
 
     } catch (error) {
       console.error("Error submitting job:", error);
@@ -112,25 +281,33 @@ export function JobsTab() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="title">Job Title <span className="text-red-500">*</span></Label>
-              <Input
-                id="title"
-                name="title"
+              <Label htmlFor="title">Required Skill <span className="text-red-500">*</span></Label>
+              <Select
                 value={jobFormData.title}
-                onChange={handleChange}
-                placeholder="e.g. Construction Worker"
-                required
-              />
+                onValueChange={handleSkillChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select required skill" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEFAULT_SKILLS.map((skill) => (
+                    <SelectItem key={skill} value={skill}>
+                      {skill}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="company">Company Name <span className="text-red-500">*</span></Label>
+              <Label htmlFor="workers_needed">Number of Workers Needed <span className="text-red-500">*</span></Label>
               <Input
-                id="company"
-                name="company"
-                value={jobFormData.company}
+                id="workers_needed"
+                name="workers_needed"
+                type="number"
+                min={1}
+                value={jobFormData.workers_needed}
                 onChange={handleChange}
-                placeholder="e.g. ABC Construction Ltd"
                 required
               />
             </div>

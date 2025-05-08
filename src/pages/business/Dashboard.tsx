@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from "react";
 import { supabase, getAllWorkers } from "@/utils/supabaseClient";
 import { JobsTab } from "@/components/business/JobsTab";
+import { JobNotificationsTab } from "@/components/business/JobNotificationsTab";
 
 export default function BusinessDashboard() {
   const [activeTab, setActiveTab] = useState("business-details");
@@ -25,7 +26,6 @@ export default function BusinessDashboard() {
     description: ""
   });
   const [business, setBusiness] = useState<any>(null);
-  const [tab, setTab] = useState("jobs");
 
   useEffect(() => {
     const fetchBusiness = async () => {
@@ -98,16 +98,120 @@ export default function BusinessDashboard() {
 
   return (
     <DashboardLayout>
-      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
-        <TabsList className="overflow-x-auto w-full flex flex-nowrap lg:justify-start">
-          <TabsTrigger value="jobs" className="flex-shrink-0 animate-pulse">Post Jobs</TabsTrigger>
-        </TabsList>
-        <TabsContent value="jobs" className="animate-fade-in">
-          <div className="mt-4">
-            <JobsTab />
-          </div>
-        </TabsContent>
-      </Tabs>
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Business Dashboard</h1>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="business-details">Business Details</TabsTrigger>
+            <TabsTrigger value="worker-request">Worker Request</TabsTrigger>
+            <TabsTrigger value="view-requests">View Requests</TabsTrigger>
+            <TabsTrigger value="jobs">Post Jobs</TabsTrigger>
+            <TabsTrigger value="job-notifications">Job Notifications</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="business-details">
+            <DashboardCard title="Business Details">
+              {business ? (
+                <BusinessUserDetails business={business} onEdit={() => {}} />
+              ) : (
+                <div>No business details found.</div>
+              )}
+            </DashboardCard>
+          </TabsContent>
+
+          <TabsContent value="worker-request">
+            <DashboardCard title="Worker Request">
+              <Button onClick={() => setDialogOpen(true)} className="mb-4" disabled={!business}>
+                Request Worker
+              </Button>
+              <Dialog open={dialogOpen && !!business} onOpenChange={setDialogOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Request Worker</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Number of Workers Needed</label>
+                        <Input type="number" name="workersNeeded" min={1} value={form.workersNeeded} onChange={handleChange} required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Required Skill</label>
+                        <Select value={form.skill} onValueChange={v => handleSelect("skill", v)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select skill" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Carpenter">Carpenter</SelectItem>
+                            <SelectItem value="Plumber">Plumber</SelectItem>
+                            <SelectItem value="Cook">Cook</SelectItem>
+                            <SelectItem value="Electrician">Electrician</SelectItem>
+                            <SelectItem value="Cleaner">Cleaner</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Priority Level</label>
+                        <Select value={form.priority} onValueChange={v => handleSelect("priority", v)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Normal">Normal</SelectItem>
+                            <SelectItem value="Urgent">Urgent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Estimated Duration</label>
+                        <Input type="text" name="duration" value={form.duration} onChange={handleChange} placeholder="e.g., 2 days, 1 week" required />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Description (optional)</label>
+                      <Input type="text" name="description" value={form.description} onChange={handleChange} />
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit">Submit Request</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              {/* Confirmation Dialog */}
+              <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>Confirm Submission</DialogTitle>
+                  </DialogHeader>
+                  <div>Do you want to submit this request?</div>
+                  <DialogFooter>
+                    <Button onClick={handleConfirm}>OK</Button>
+                    <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </DashboardCard>
+          </TabsContent>
+
+          <TabsContent value="view-requests">
+            <DashboardCard title="Your Requests">
+              <BusinessRequestsTab />
+            </DashboardCard>
+          </TabsContent>
+
+          <TabsContent value="jobs">
+            <DashboardCard title="Post Jobs">
+              <JobsTab />
+            </DashboardCard>
+          </TabsContent>
+
+          <TabsContent value="job-notifications">
+            <DashboardCard title="Job Notifications">
+              <JobNotificationsTab />
+            </DashboardCard>
+          </TabsContent>
+        </Tabs>
+      </div>
     </DashboardLayout>
   );
 } 

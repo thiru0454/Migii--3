@@ -5,6 +5,7 @@ import { BusinessesTab } from "@/components/admin/BusinessesTab";
 import { HelpRequestsTab } from "@/components/admin/HelpRequestsTab";
 import { WorkersMap } from "@/components/admin/WorkersMap";
 import { WorkerRequestsTab } from "@/components/admin/WorkerRequestsTab";
+import { JobNotificationsTab } from "@/components/admin/JobNotificationsTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
@@ -35,6 +36,7 @@ export default function AdminDashboard() {
           <TabsTrigger value="help" className="flex-shrink-0">Help Requests</TabsTrigger>
           <TabsTrigger value="locations" className="flex-shrink-0">Live Map</TabsTrigger>
           <TabsTrigger value="requests" className="flex-shrink-0">Worker Requests</TabsTrigger>
+          <TabsTrigger value="job-notifications" className="flex-shrink-0">Job Notifications</TabsTrigger>
         </TabsList>
         <TabsContent value="workers" className="animate-fade-in">
           <div className="mt-4">
@@ -59,6 +61,11 @@ export default function AdminDashboard() {
         <TabsContent value="requests" className="animate-fade-in">
           <div className="mt-4">
             <WorkerRequestsTab />
+          </div>
+        </TabsContent>
+        <TabsContent value="job-notifications" className="animate-fade-in">
+          <div className="mt-4">
+            <JobNotificationsTab />
           </div>
         </TabsContent>
       </Tabs>
