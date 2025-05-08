@@ -62,11 +62,10 @@ const adminLinks: SidebarLinkItem[] = [
     icon: Building,
   },
   {
-    title: "Post Jobs",
-    href: "/admin-dashboard/jobs",
-    icon: Briefcase,
-    isHighlighted: true
-  }
+    title: "Support Requests",
+    href: "/admin-dashboard/support-requests",
+    icon: MessageSquare,
+  },
 ];
 
 // Business-only links
@@ -85,6 +84,12 @@ const businessLinks: SidebarLinkItem[] = [
     title: "Projects",
     href: "/business-dashboard/projects",
     icon: Briefcase,
+  },
+  {
+    title: "Post Jobs",
+    href: "/business-dashboard/jobs",
+    icon: Briefcase,
+    isHighlighted: true
   }
 ];
 

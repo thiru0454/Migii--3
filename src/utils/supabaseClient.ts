@@ -270,3 +270,36 @@ export async function updateApplicationStatus(id: string, status: string, notes?
     .select()
     .single();
 }
+
+// Submit a new support request
+type SupportRequest = {
+  name: string;
+  email: string;
+  message: string;
+};
+
+export async function submitSupportRequest(request: SupportRequest) {
+  return await supabase
+    .from('support_requests')
+    .insert([{ ...request }])
+    .select()
+    .single();
+}
+
+// Fetch all support requests
+export async function getSupportRequests() {
+  return await supabase
+    .from('support_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+}
+
+// Update support request status
+export async function updateSupportRequestStatus(id: string, status: string) {
+  return await supabase
+    .from('support_requests')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+}

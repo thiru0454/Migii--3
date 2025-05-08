@@ -27,18 +27,18 @@ const WorkerLogin = () => {
         if (!error && data) {
           if (currentUser.phone) {
             worker = data.find((w: any) => {
-              const dbPhone = String(w["Phone Number"]).trim();
+              const dbPhoneLegacy = w["Phone Number"] ? String(w["Phone Number"]).trim() : "";
+              const dbPhoneNew = w.phone ? String(w.phone).trim() : "";
               const userPhone = String(currentUser.phone).trim();
-              console.log('[WorkerLogin Dashboard] Comparing:', dbPhone, userPhone);
-              return dbPhone === userPhone;
+              return dbPhoneLegacy === userPhone || dbPhoneNew === userPhone;
             });
           }
           if (!worker && currentUser.email) {
             worker = data.find((w: any) => {
-              const dbEmail = String(w["Email Address"]).trim();
+              const dbEmailLegacy = w["Email Address"] ? String(w["Email Address"]).trim() : "";
+              const dbEmailNew = w.email ? String(w.email).trim() : "";
               const userEmail = String(currentUser.email).trim();
-              console.log('[WorkerLogin Dashboard] Comparing:', dbEmail, userEmail);
-              return dbEmail === userEmail;
+              return dbEmailLegacy === userEmail || dbEmailNew === userEmail;
             });
           }
         }
